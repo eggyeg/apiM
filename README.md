@@ -16,6 +16,23 @@ The smartest API manager with intelligent web search, thinking effort control, a
 
 ## Quick Start
 
+### Option 0: Run the web app (Next.js)
+
+```bash
+npm install
+
+# Optional — enables saved chat history
+cp .env.example .env   # then edit DATABASE_URL
+
+npm run dev
+```
+
+Open http://localhost:3000 and add your DeepSeek API key via **Settings**.
+
+`DATABASE_URL` is **optional**: without it the app still runs and answers
+messages, but conversations aren't persisted and the history sidebar stays
+empty. Check `GET /api/health` to see the current database status.
+
 ### Option 1: Run with Python
 
 ```bash
@@ -34,6 +51,24 @@ python build.py
 ```
 
 The executable will be in the `dist` folder. Just double-click to run!
+
+## Testing
+
+```bash
+npm test
+```
+
+Runs every suite — 1,361 checks — in about 90 seconds. It never calls the
+paid API; `npm run test:real` does that and is opt-in.
+
+```bash
+npm test plan       # one suite
+npm run typecheck   # types
+npm run lint        # unused code, React mistakes
+npm run score       # rates all 33 agent tools
+```
+
+See [docs/testing.md](docs/testing.md).
 
 ## Requirements
 
