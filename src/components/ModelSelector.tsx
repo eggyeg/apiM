@@ -1,34 +1,31 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import {
+  getDeepSeekPeriod,
+  formatCountdown,
+} from "@/lib/deepseek-hours";
+import { MODELS, getModel } from "@/lib/models";
 
 interface ModelSelectorProps {
   value: string;
   onChange: (value: string) => void;
 }
 
-const MODELS = [
-  {
-    id: "deepseek-v4-pro",
-    label: "DeepSeek V4 Pro",
-    shortLabel: "V4 Pro",
-    description: "49B parameters. Frontier-level quality for the hardest tasks.",
-    specs: "1M context · 384K max output",
-  },
-  {
-    id: "deepseek-v4-flash",
-    label: "DeepSeek V4 Flash",
-    shortLabel: "V4 Flash",
-    description: "13B parameters. Fast and economical for quick tasks.",
-    specs: "1M context · 384K max output",
-  },
-];
-
 export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const current = MODELS.find((m) => m.id === value) || MODELS[0];
+  const current = getModel(value);
+  const showPeakHours = current.peakHours;
+
+  // DeepSeek peak/off-peak indicator. Off-peak (16:30-00:30 Beijing time,
+  // UTC+8) gives roughly half-price cache tokens; it updates every minute.
+  const [period, setPeriod] = useState(() => getDeepSeekPeriod());
+  useEffect(() => {
+    const t = setInterval(() => setPeriod(getDeepSeekPeriod()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -80,9 +77,22 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
           />
         </svg>
         <span>{current.shortLabel}</span>
+        {showPeakHours && (
+        <span
+          aria-hidden
+          title={
+            period.period === "offpeak"
+              ? `DeepSeek off-peak (discount) — ends ${period.nextChangeAtLocal} your time (${period.nextChangeAtBeijing}), in ${formatCountdown(period.nextChangeInMinutes)}`
+              : `DeepSeek peak pricing — off-peak starts ${period.nextChangeAtLocal} your time (${period.nextChangeAtBeijing}), in ${formatCountdown(period.nextChangeInMinutes)}`
+          }
+          className={`ml-0.5 h-1.5 w-1.5 rounded-full ${
+            period.period === "offpeak" ? "bg-emerald-400" : "bg-amber-400"
+          }`}
+        />
+        )}
         <svg
           style={{ width: 11, height: 11 }}
-          className={`opacity-60 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          className={`opacity-60 transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -102,7 +112,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                   Model
                 </p>
                 <p className="mt-0.5 text-[11px] leading-4 text-text-muted">
-                  Which DeepSeek model answers your messages
+                  DeepSeek, OpenCode, or a local Qwen
                 </p>
               </div>
               <button
@@ -124,6 +134,40 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                 </svg>
               </button>
             </div>
+
+            {/* Peak/off-peak is DeepSeek-only. Ox Alpha is free on OpenCode. */}
+            {showPeakHours && (
+            <div className="border-b border-border px-4 py-2.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+                    period.period === "offpeak"
+                      ? "bg-emerald-500/15 text-emerald-300"
+                      : "bg-amber-500/15 text-amber-300"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      period.period === "offpeak"
+                        ? "bg-emerald-400"
+                        : "bg-amber-400"
+                    }`}
+                  />
+                  {period.period === "offpeak" ? "Off-peak" : "Peak"}
+                </span>
+                <span className="text-[11px] leading-4 text-text-muted">
+                  {period.period === "offpeak"
+                    ? "Discount pricing active"
+                    : "Standard pricing"}{" "}
+                  · switches to{" "}
+                  {period.period === "offpeak" ? "peak" : "off-peak"} at{" "}
+                  {period.nextChangeAtLocal} your time (
+                  {period.nextChangeAtBeijing}, in{" "}
+                  {formatCountdown(period.nextChangeInMinutes)})
+                </span>
+              </div>
+            </div>
+            )}
 
             {/* Scrollable list */}
             <div
