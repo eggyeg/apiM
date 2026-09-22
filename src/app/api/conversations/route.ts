@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
-import { conversations } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { listConversations } from "@/lib/store";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const convs = await db
-      .select()
-      .from(conversations)
-      .orderBy(desc(conversations.updatedAt))
-      .limit(50);
-    return NextResponse.json(convs);
+    return NextResponse.json(await listConversations());
   } catch (error) {
-    console.error("Error fetching conversations:", error);
-    return NextResponse.json([], { status: 200 });
+    console.error("Error listing conversations:", error);
+    return NextResponse.json([]);
   }
 }

@@ -5,6 +5,8 @@ import { useState, useRef, useEffect } from "react";
 interface ThinkingEffortSelectorProps {
   value: string;
   onChange: (value: string) => void;
+  /** Which model this applies to — the options differ per model. */
+  model?: string;
 }
 
 const EFFORTS = [
@@ -40,14 +42,76 @@ const EFFORTS = [
   },
 ];
 
+/**
+ * What the model actually does with the level you pick.
+ *
+ * From DeepSeek's own mapping table (api-docs.deepseek.com/guides/
+ * thinking_mode). V4 Pro silently maps `low` up to `high`, so on Pro the
+ * menu was offering a setting that did nothing: picking Low cost exactly the
+ * same as picking High, which is the sort of thing you only discover from a
+ * bill.
+ *
+ *   requested   flash     pro
+ *   low         low       high
+ *   high        high      high
+ *   max         max       max
+ *
+ * Rather than hide the option — which would make the choice vanish when
+ * switching models and lose a setting the user had picked — Low is kept and
+ * labelled with what it really does.
+ */
+function effortsFor(model: string) {
+  const isPro = model === "deepseek-v4-pro";
+  const isQwen = model === "qwen-3.8-27b";
+  return EFFORTS.map((e) => {
+    if (isPro && e.id === "low") {
+      return {
+        ...e,
+        description: "Same as High on V4 Pro — this model has no light mode.",
+        warning: "Switch to V4 Flash for genuinely cheaper reasoning.",
+      };
+    }
+    if (isQwen) {
+      if (e.id === "none") {
+        return {
+          ...e,
+          description: "enable_thinking: false — answers without a think block.",
+        };
+      }
+      if (e.id === "low") {
+        return {
+          ...e,
+          description: "Qwen reasoning_effort=low.",
+        };
+      }
+      if (e.id === "high") {
+        return {
+          ...e,
+          description: "Qwen reasoning_effort=medium (its middle setting).",
+        };
+      }
+      if (e.id === "max") {
+        return {
+          ...e,
+          description: "Qwen reasoning_effort=xhigh — the model default.",
+          warning: "Can think for a very long time. Use medium unless you need it.",
+        };
+      }
+    }
+    return e;
+  });
+}
+
 export function ThinkingEffortSelector({
   value,
   onChange,
+  model = "deepseek-v4-pro",
 }: ThinkingEffortSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const current = EFFORTS.find((e) => e.id === value) || EFFORTS[0];
+  const efforts = effortsFor(model);
+  const current = efforts.find((e) => e.id === value) || efforts[0];
 
   // Close on outside click
   useEffect(() => {
@@ -107,7 +171,7 @@ export function ThinkingEffortSelector({
         <span>{current.label}</span>
         <svg
           style={{ width: 11, height: 11 }}
-          className={`opacity-60 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          className={`opacity-60 transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -127,7 +191,9 @@ export function ThinkingEffortSelector({
                   Thinking effort
                 </p>
                 <p className="mt-0.5 text-[11px] leading-4 text-text-muted">
-                  How deeply the model reasons before replying
+                  {model === "deepseek-v4-pro"
+                    ? "V4 Pro has two real depths: High and Max"
+                    : "How deeply the model reasons before replying"}
                 </p>
               </div>
               <button
@@ -156,7 +222,7 @@ export function ThinkingEffortSelector({
               aria-label="Thinking effort"
               className="max-h-[min(22rem,calc(100dvh-260px))] overflow-y-auto p-1.5"
             >
-              {EFFORTS.map((effort) => {
+              {efforts.map((effort) => {
                 const selected = value === effort.id;
                 return (
                   <button
